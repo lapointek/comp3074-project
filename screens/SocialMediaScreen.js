@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text, Button, Alert, StyleSheet } from "react-native";
-import * as Linking from "expo-linking";
 
 export default function SocialMediaScreen() {
   function showAlert() {

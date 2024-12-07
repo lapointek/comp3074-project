@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import * as Location from "expo-location";
 import {
   View,
   Text,
@@ -8,18 +9,26 @@ import {
   TextInput,
   Button,
   Alert,
+  Modal,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
-import { Provider as PaperProvider, Appbar } from "react-native-paper";
+import {
+  Provider as PaperProvider,
+  Appbar,
+  TextInput as PaperInput,
+} from "react-native-paper";
+import { useNavigation } from "@react-navigation/native";
 
 const Data = [
-  { id: "1", title: "Keg" },
-  { id: "2", title: "Thai-One-on" },
-  { id: "3", title: "Mcdonalds" },
-  { id: "4", title: "Mandarin" },
-  { id: "5", title: "JoesBurgers" },
-  { id: "6", title: "Port" },
-  { id: "7", title: "Sakura" },
-  { id: "8", title: "PizzaHut" },
+  { id: "1", title: "Keg", rated: null },
+  { id: "2", title: "Thai-One-on", rated: null },
+  { id: "3", title: "Mcdonalds", rated: null },
+  { id: "4", title: "Mandarin", rated: null },
+  { id: "5", title: "JoesBurgers", rated: null },
+  { id: "6", title: "Port", rated: null },
+  { id: "7", title: "Sakura", rated: null },
+  { id: "8", title: "PizzaHut", rated: null },
 ];
 
 const altSearch = {
@@ -30,22 +39,84 @@ const altSearch = {
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [location, setLocation] = useState(null);
+  const [locationPermission, setLocationPermission] = useState(false);
+  const navigation = useNavigation();
+  const [data, setData] = useState(Data);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [rating, setRating] = useState("");
 
-  const filterData = Data.filter((item) => {
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const currentLocation = await Location.getCurrentPositionAsync({});
+        setLocation(currentLocation);
+        setLocationPermission(true);
+      } else {
+        Alert.alert("Permission denied", "Location permission is required.");
+      }
+    })();
+  }, []);
+
+  const filterData = data.filter((item) => {
     const normalizedQuery = searchQuery.toLowerCase();
-    const itemTitle = item.title.toLowerCase();
-
-    if (itemTitle.includes(normalizedQuery)) {
-      return true;
-    }
-    const alternatives = altSearch[item.title] || [];
-    return alternatives.some((term) =>
-      term.toLowerCase().includes(normalizedQuery)
+    return (
+      item.title.toLowerCase().includes(normalizedQuery) ||
+      (altSearch[item.title] || []).some((term) =>
+        term.toLowerCase().includes(normalizedQuery)
+      )
     );
   });
 
   const handleButtonPress = (title) => {
-    Alert.alert(`Showing Details for ${title}`);
+    setSelectedRestaurant(title);
+  };
+
+  const handleRatePress = (item) => {
+    setSelectedRestaurant(item.title);
+    setModalVisible(true);
+  };
+
+  const handleSubmitRating = () => {
+    const numericRating = parseInt(rating, 10);
+    if (!isNaN(numericRating) && numericRating >= 1 && numericRating <= 5) {
+      const newData = data.map((restaurant) => {
+        if (restaurant.title === selectedRestaurant) {
+          return { ...restaurant, rated: numericRating.toString() };
+        }
+        return restaurant;
+      });
+      setData(newData);
+      setRating("");
+      setModalVisible(false);
+      Alert.alert(`Rated ${selectedRestaurant} with ${numericRating} stars!`);
+    } else {
+      Alert.alert("Invalid rating", "Please enter a number between 1 and 5.");
+    }
+  };
+
+  const handleDirectionsPress = () => {
+    if (location) {
+      navigation.navigate("Directions", {
+        restaurant: selectedRestaurant,
+        location: location.coords,
+      });
+      setSelectedRestaurant(null);
+    } else {
+      Alert.alert(
+        "Location not available",
+        "Unable to fetch your current location."
+      );
+    }
+  };
+
+  const handleViewRated = () => {
+    const ratedRestaurants = data.filter(
+      (restaurant) => restaurant.rated !== null
+    );
+    navigation.navigate("RatedScreen", { ratedData: ratedRestaurants });
   };
 
   return (
@@ -66,14 +137,52 @@ export default function SearchScreen() {
           renderItem={({ item }) => (
             <View style={styles.item}>
               <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.rating}>
+                Rating: {item.rated ? item.rated : "Not rated yet"}
+              </Text>
               <Button
-                style={styles.button}
                 title="Details"
                 onPress={() => handleButtonPress(item.title)}
               />
+              {selectedRestaurant === item.title && (
+                <View>
+                  <Button
+                    title="Get Directions"
+                    onPress={handleDirectionsPress}
+                  />
+                  <Button
+                    title="Rate Restaurant"
+                    onPress={() => handleRatePress(item)}
+                  />
+                </View>
+              )}
             </View>
           )}
         />
+        <Button title="View Rated Restaurants" onPress={handleViewRated} />
+
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Rate {selectedRestaurant}</Text>
+                <PaperInput
+                  label="Enter your rating (1-5)"
+                  keyboardType="numeric"
+                  value={rating}
+                  onChangeText={setRating}
+                />
+                <Button title="Submit" onPress={handleSubmitRating} />
+                <Button title="Cancel" onPress={() => setModalVisible(false)} />
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       </SafeAreaView>
     </PaperProvider>
   );
@@ -102,5 +211,22 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    marginBottom: 10,
   },
 });

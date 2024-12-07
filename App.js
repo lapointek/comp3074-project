@@ -11,7 +11,7 @@ export default function App() {
     <NavigationContainer>
       <Tab.Navigator initialRouteName="Search">
         <Tab.Screen name="Search" component={SearchScreen} />
-        <Tab.Screen name="Rated Restaurants" component={RatedScreen} />
+        <Tab.Screen name="RatedScreen" component={RatedScreen} />
         <Tab.Screen name="Directions" component={MapScreen} />
         <Tab.Screen name="Social" component={SocialMediaScreen} />
       </Tab.Navigator>
