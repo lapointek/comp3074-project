@@ -13,10 +13,6 @@ const RatedScreen = ({ route, navigation }) => {
         </Appbar>
         <View style={styles.noRatingsContainer}>
           <Text>No rated restaurants found.</Text>
-          <Button
-            title="Go back to Search"
-            onPress={() => navigation.goBack()}
-          />
         </View>
       </View>
     );
